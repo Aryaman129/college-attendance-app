@@ -1,0 +1,57 @@
+import os
+import asyncio
+from playwright.async_api import async_playwright
+from supabase import create_client
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+# Load environment variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+app = FastAPI()
+
+def get_supabase_client():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+async def scrape_attendance(registration_number: str):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
+        # Navigate to the login page
+        await page.goto("https://example.com/login")
+        await page.fill("#username", "your_username")
+        await page.fill("#password", "your_password")
+        await page.click("#login-button")
+        
+        await page.wait_for_timeout(5000)  # Wait for login to complete
+        
+        # Navigate to the attendance page
+        await page.goto(f"https://example.com/attendance/{registration_number}")
+        await page.wait_for_selector(".attendance-data")
+        
+        attendance_data = await page.inner_text(".attendance-data")
+        await browser.close()
+        
+        return attendance_data
+
+class RequestData(BaseModel):
+    registration_number: str
+
+@app.post("/api/scrape-attendance")
+async def fetch_attendance(data: RequestData):
+    supabase = get_supabase_client()
+    attendance_data = await scrape_attendance(data.registration_number)
+
+    # Store in Supabase
+    response = supabase.table("attendance_records").insert({
+        "registration_number": data.registration_number,
+        "attendance": attendance_data
+    }).execute()
+
+    return {"message": "Data saved successfully", "data": response}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
