@@ -1,0 +1,25 @@
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "package.json",
+        "use": "@vercel/next"
+      },
+      {
+        "src": "api/*.py",
+        "use": "@vercel/python"
+      }
+    ],
+    "functions": {
+      "api/*.py": {
+        "runtime": "python3.9"
+      }
+    },
+    "routes": [
+      {
+        "src": "/api/(.*)",
+        "dest": "/api/$1"
+      }
+    ]
+  }
+  
